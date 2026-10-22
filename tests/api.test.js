@@ -8,10 +8,10 @@ describe("API health endpoint", () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ status: "ok" });
   });
-});
 
-test("GET /health returns the wrong status (demo)", async () => {
-  const response = await request(app).get("/health");
+  test("GET /health returns 200 (demo fixed)", async () => {
+    const response = await request(app).get("/health");
 
-  expect(response.status).toBe(201);
+    expect(response.status).toBe(200);
+  });
 });
