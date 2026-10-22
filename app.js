@@ -21,7 +21,12 @@ app.get("/version", (req, res) => {
     message: "My first CI/CD deployment!"
   });
 });
-
+app.get("/about", (req, res) => {
+  res.json({
+    project: "Hello Production API",
+    purpose: "Learning CI/CD"
+  });
+});
 module.exports = app;
 
 if (require.main === module) {
