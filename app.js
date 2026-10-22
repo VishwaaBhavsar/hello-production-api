@@ -1,8 +1,6 @@
-
 const express = require("express");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
@@ -23,6 +21,13 @@ app.get("/version", (req, res) => {
     message: "My first CI/CD deployment!"
   });
 });
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`API listening on port ${PORT}`);
-});
+
+module.exports = app;
+
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`API listening on port ${PORT}`);
+  });
+}
