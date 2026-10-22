@@ -9,3 +9,9 @@ describe("API health endpoint", () => {
     expect(response.body).toEqual({ status: "ok" });
   });
 });
+
+test("GET /health returns the wrong status (demo)", async () => {
+  const response = await request(app).get("/health");
+
+  expect(response.status).toBe(201);
+});
