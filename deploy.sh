@@ -63,12 +63,25 @@ echo "🔄 Restarting $SERVICE_NAME..."
 sudo systemctl restart "$SERVICE_NAME"
 sudo systemctl is-active --quiet "$SERVICE_NAME"
 
-# 7. Verify health through Nginx
+
+# 7. Verify health through Nginx, retrying during startup
 echo "🏥 Checking API health..."
-if ! curl --fail --silent --show-error \
-  --insecure --max-time 10 "$HEALTH_URL"; then
-  echo
-  echo "❌ Health check failed."
+
+HEALTHY=false
+
+for attempt in {1..10}; do
+  if curl --fail --silent --show-error \
+    --insecure --max-time 3 "$HEALTH_URL"; then
+    HEALTHY=true
+    break
+  fi
+
+  echo "Health check attempt $attempt failed; retrying in 3 seconds..."
+  sleep 3
+done
+
+if [[ "$HEALTHY" != "true" ]]; then
+  echo "❌ Health check failed after retries."
   echo "Inspect logs with:"
   echo "sudo journalctl -u $SERVICE_NAME -n 50 --no-pager"
   exit 1
@@ -76,3 +89,4 @@ fi
 
 echo
 echo "✅ Deployment checks completed!"
+
