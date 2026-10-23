@@ -10,51 +10,66 @@ cd "$PROJECT_DIR"
 
 echo "🚀 Starting deployment..."
 
-# 1. Ensure there are no uncommitted changes
+# 1. Require a clean working tree
 if [[ -n "$(git status --porcelain)" ]]; then
-  echo "❌ Working tree is not clean. Commit or stash changes first."
+  echo "❌ Working tree is not clean."
+  echo "Commit or stash changes before deploying."
   exit 1
 fi
 
-# 2. Ensure we're deploying main
-BRANCH="$(git branch --show-current)"
-if [[ "$BRANCH" != "main" ]]; then
-  echo "❌ Expected branch 'main', found '$BRANCH'."
+# 2. Require main branch
+if [[ "$(git branch --show-current)" != "main" ]]; then
+  echo "❌ Deployments must run from main."
   exit 1
 fi
 
-# 3. Fetch approved code from GitHub
-echo "📥 Fetching latest code..."
+# 3. Fetch the latest approved code
+echo "📥 Fetching origin/main..."
 git fetch origin main
 
-# Refuse to deploy if local main has commits not on origin/main
-if ! git merge-base --is-ancestor HEAD origin/main; then
+TARGET="$(git rev-parse origin/main)"
+
+# Refuse local-only commits and divergent history
+if ! git merge-base --is-ancestor HEAD "$TARGET"; then
   echo "❌ Local main has commits not contained in origin/main."
-  echo "Review Git history before deploying."
+  echo "Push or review those commits before deploying."
   exit 1
 fi
 
-echo "📦 Updating code..."
-git merge --ff-only origin/main
+# 4. Test incoming code in a temporary Git worktree
+TEST_DIR="$(mktemp -d)"
+cleanup() {
+  git worktree remove --force "$TEST_DIR" >/dev/null 2>&1 || true
+  rmdir "$TEST_DIR" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
 
-# 4. Install dependencies and run tests
-echo "📦 Installing dependencies..."
-npm ci
+echo "🧪 Testing incoming code before updating main..."
+git worktree add --detach "$TEST_DIR" "$TARGET"
+(
+  cd "$TEST_DIR"
+  npm ci
+  npm test
+)
 
-echo "🧪 Running tests..."
-npm test
+echo "✅ Tests passed."
 
-# 5. Restart the service
+# 5. Update main only after tests pass
+echo "📦 Updating local main..."
+git merge --ff-only "$TARGET"
+
+# 6. Restart the service
 echo "🔄 Restarting $SERVICE_NAME..."
 sudo systemctl restart "$SERVICE_NAME"
 sudo systemctl is-active --quiet "$SERVICE_NAME"
 
-# 6. Verify the API through Nginx
+# 7. Verify health through Nginx
 echo "🏥 Checking API health..."
 if ! curl --fail --silent --show-error \
   --insecure --max-time 10 "$HEALTH_URL"; then
   echo
-  echo "❌ Health check failed. Inspect service logs:"
+  echo "❌ Health check failed."
+  echo "Inspect logs with:"
   echo "sudo journalctl -u $SERVICE_NAME -n 50 --no-pager"
   exit 1
 fi
